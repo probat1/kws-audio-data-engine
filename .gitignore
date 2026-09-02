@@ -1,15 +1,24 @@
-# Environment variables
+# Python Virtual Environment & Cache
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Environment Variables & Secrets
 .env
 .env.local
 *.env
-
-# Cache & Temporary Files
-__pycache__/
-*.pyc
-.temp/
-
-# Dependencies
-node_modules/
-
-# Secrets
 supabase/
+
+# IDE & Logs
+.idea/
+.vscode/
+*.log
+scratch/
+.system_generated/
+
+# Data artifacts (optional large binaries if not tracked in Git LFS)
+# dataset/final_train/

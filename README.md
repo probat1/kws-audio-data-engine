@@ -1,274 +1,129 @@
-# Voice Sample Collection Web App
+# Voice Data Engineering & Acoustic Augmentation Suite
 
-A premium, production-ready web application for collecting 15-second voice samples to train keyword-spotting ML models. Built with vanilla HTML/CSS/JS, Firebase Storage, and Firestore.
-
----
-
-## Features
-
-- **Dark glassmorphism UI** with animated mesh gradient background
-- **15-second timed recordings** with circular progress indicator
-- **Audio playback** before submission
-- **Metadata collection**: contributor name, target word, category (Negative/Trigger/Rhyming), background noise flag
-- **Firebase integration**: audio files uploaded to Storage, metadata saved to Firestore
-- **Fully accessible** with ARIA labels, keyboard navigation, and screen reader support
-- **Mobile responsive** down to 360px width
-- **Reduced motion support** for accessibility
+A specialized, production-ready audio data engineering pipeline for **Keyword-Spotting (KWS) Machine Learning models**. Built strictly adhering to the **Data Engineering & Collection Tooling Lead Specification**.
 
 ---
 
-## File Structure
+## 🌟 Architecture Overview
 
 ```
-voice-data-collector/
-├── index.html          # Main HTML structure
-├── styles.css          # All styles and animations
-├── app.js             # Recording logic and Firebase integration
-├── firebase-config.js  # Firebase configuration (edit this)
-└── README.md          # This file
+                          ┌────────────────────────┐
+                          │   words_config.json    │
+                          └───────────┬────────────┘
+                                      ▼
+                        [ tts_pipeline/ ]
+             (Edge-TTS, 10+ Voices, Pitch/Rate Matrix)
+                                      │
+                                      ▼
+                      [ dataset/synthetic/ ]
+                                      │
+                                      ▼
+                       [ noise_pipeline/ ]
+             (Dynamic SNR Mixing: Clean, 15dB, 10dB, 5dB)
+             (Noise Banks: Claps, Fan Hum, Room Chatter)
+                                      │
+                                      ▼
+                     [ dataset/final_train/ for ML Lead ]
 ```
 
 ---
 
-## Setup Instructions
+## 📂 Project Structure
 
-### 1. Firebase Project Setup
-
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Create a new project (or use an existing one)
-3. Enable **Firestore Database** (Start in test mode for development)
-4. Enable **Storage** (Start in test mode for development)
-5. Go to **Project Settings** → **General** → **Your apps**
-6. Click **Web** (</>), register your app, and copy the config object
-
-### 2. Configure Firebase Keys
-
-Open `firebase-config.js` and replace the placeholder values with your Firebase config:
-
-```javascript
-const firebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT.firebaseapp.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
-};
+```
+Voice-data-collector/
+│
+├── 🗣️ tts_pipeline/                     # Synthetic Voice Generation Package (Sprint 2)
+│   ├── __init__.py
+│   ├── voices_config.py                 # Vocal profiles, pitch, speed, and volume matrix
+│   ├── tts_engine.py                    # Edge-TTS streamer, audio trimming & 1.0s normalization
+│   └── generate_synthetic_data.py       # Batch orchestrator & CLI parser
+│
+├── 🔊 noise_pipeline/                   # Noise Merging & Augmentation Package (Sprint 3)
+│   ├── __init__.py
+│   ├── snr_mixer.py                     # RMS energy calculation & Dynamic SNR mixing engine
+│   ├── download_noise_banks.py          # Acoustic noise generator & downloader (claps, fan, chatter)
+│   └── augment_dataset.py               # Dataset scanner, batch 4-way augmentor & packager
+│
+├── 📂 dataset/                          # Audio Datasets & Catalogs
+│   ├── synthetic/                       # 16 kHz 1.0s Mono synthetic TTS samples
+│   ├── noise_banks/                     # Acoustic noise banks (fan, chatter, claps, knocks)
+│   └── final_train/                     # Balanced, 4-way augmented dataset for ML training
+│       ├── trigger_word/
+│       ├── negative_word/rhyming/
+│       ├── negative_word/general/
+│       └── train_catalog.csv
+│
+├── words_config.json                    # Target keyword, rhyming, and negative vocabulary config
+├── generate_synthetic_data.py           # Convenience root CLI runner for TTS
+├── download_noise_banks.py              # Convenience root CLI runner for Noise Banks
+├── augment_dataset.py                   # Convenience root CLI runner for Noise Augmentation
+├── test_pipeline.py                     # Automated test suite (pytest)
+├── metadata.db                          # SQLite catalog database
+├── dataset_catalog.csv                  # Raw dataset CSV catalog
+└── requirements.txt                     # Project dependencies
 ```
 
-### 3. Run the App Locally
+---
 
-The app **must** be served over HTTP/HTTPS (not via `file://` protocol) for microphone access and ES modules to work.
+## 🚀 Execution Guide
 
-**Option 1: Using npx serve**
+### 1. Installation
+
 ```bash
-cd voice-data-collector
-npx serve .
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
 ```
-Then open `http://localhost:3000`
 
-**Option 2: Using Python**
+---
+
+### 2. Synthetic TTS Generation (`tts_pipeline`)
+
+Generate diverse synthetic vocal profiles across pitch, rate, and volume variations:
+
 ```bash
-cd voice-data-collector
-python -m http.server 8000
-```
-Then open `http://localhost:8000`
+# Preview plan without generating files
+python -m tts_pipeline.generate_synthetic_data --dry-run
 
-**Option 3: Using VS Code Live Server**
-- Install the "Live Server" extension
-- Right-click `index.html` → **Open with Live Server**
-
----
-
-## How It Works
-
-### User Flow
-
-1. Enter your **Name** and **Target Word**
-2. Select **Category**: Negative Word / Trigger Word / Rhyming Word
-3. Click the **record button** to start recording (15 seconds, auto-stops)
-4. Listen to the playback using the audio player
-5. Toggle **background noise flag** if applicable
-6. Click **Submit Data** to upload
-
-### Data Schema (Firestore)
-
-Each submission creates a document in the `voiceSamples` collection:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Contributor's name |
-| `targetWord` | string | The word spoken in the clip |
-| `category` | string | "Negative Word" / "Trigger Word" / "Rhyming Word" |
-| `hasBackgroundNoise` | boolean | Whether background noise was flagged |
-| `audioUrl` | string | Firebase Storage download URL |
-| `audioPath` | string | Storage path for file reference |
-| `mimeType` | string | Recorded audio format (webm/mp4/ogg) |
-| `durationMs` | number | Always 15000 (15 seconds) |
-| `createdAt` | timestamp | Server timestamp of submission |
-
-### Storage Structure
-
-Audio files are stored at: `recordings/{safe_name}_{safe_word}_{timestamp}.{ext}`
-
-Example: `recordings/john_doe_hello_1725119939000.webm`
-
----
-
-## Browser Compatibility
-
-- **Chrome/Edge**: ✅ (recommended, best webm/opus support)
-- **Firefox**: ✅ (uses ogg/opus)
-- **Safari**: ✅ (uses mp4)
-- **Mobile browsers**: ✅ (responsive design, touch-friendly)
-
----
-
-## Security Notes
-
-⚠️ **The default Firebase rules are for TESTING ONLY**
-
-For production, update your Firestore and Storage rules in the Firebase Console:
-
-**Firestore Rules (basic authentication):**
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /voiceSamples/{document=**} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-  }
-}
+# Generate 1,500 keyword samples + 1,000 rhyming/negative samples
+python -m tts_pipeline.generate_synthetic_data --trigger-count 1500 --other-count 1000 --concurrency 10
 ```
 
-**Storage Rules (basic authentication):**
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /recordings/{allPaths=**} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-  }
-}
+- **Voice Profiles**: 10+ distinct voices in `tts_pipeline/voices_config.py` (Indian English, Hindi, US, UK, AU, CA, Male & Female).
+- **Matrix Variations**: 5 speed rates (0.75x–1.25x), 5 pitch adjustments (-15Hz to +20Hz), 3 volume levels (-6dB, 0dB, +4dB).
+- **Auto-trimming**: Strictly enforces **1.0-second 16 kHz Mono WAV** files with centered speech.
+
+---
+
+### 3. Noise Augmentation & Packaging (`noise_pipeline`)
+
+#### Step A: Generate Acoustic Noise Banks
+```bash
+python -m noise_pipeline.download_noise_banks
 ```
+Generates 16 kHz noise profiles in `dataset/noise_banks/`:
+- Low Noise: Fan hum & motor airflow
+- Medium Noise: Room background chatter & keyboard typing
+- High Noise / Impulse: Sudden hand claps (for the **"Clap" Test**) & desk/door knocks
 
----
-
-## Design System
-
-### Color Tokens
-
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `--accent` | #635BFF | Primary violet-blue |
-| `--accent-soft` | #8B7CFF | Gradient partner |
-| `--accent-2` | #22D9C0 | Teal (progress ring, success) |
-| `--danger` | #FF4D6D | Recording red |
-| `--text-primary` | #F5F6FA | Main text |
-| `--text-secondary` | #9CA3AF | Labels, helper text |
-
-### Typography
-
-- **Font**: Inter (400/500/600/700)
-- **Monospace countdown**: JetBrains Mono (500)
-- **Headline**: 28–32px, weight 600
-- **Body**: 14–16px, weight 400–500
-
----
-
-## Troubleshooting
-
-### Microphone Access Denied
-- **Chrome**: Click the 🔒 icon in the address bar → Site Settings → Microphone → Allow
-- **Firefox**: Click the 🛡️ icon → Permissions → Microphone → Allow
-- **Safari**: Safari → Settings → Websites → Microphone → Allow
-
-### CORS / Module Errors
-- Ensure you're serving via HTTP/HTTPS, not opening via `file://`
-- Check that all four files are in the same directory
-
-### Firebase Errors
-- Verify your config values in `firebase-config.js` are correct
-- Check that Firestore and Storage are enabled in the Firebase Console
-- Ensure security rules allow writes (test mode: `allow read, write: if true;`)
-
-### Recording Doesn't Stop
-- The recording auto-stops after exactly 15 seconds via `setTimeout`
-- If it hangs, check the browser console for MediaRecorder errors
-
----
-
-## Customization
-
-### Change Recording Duration
-
-Edit `app.js`:
-
-```javascript
-// Find this line (appears twice):
-recordingTimeout = setTimeout(() => {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-  }
-}, 15000); // Change 15000 to your desired ms
-
-// Also update the countdown:
-startCountdownUI(15); // Change 15 to match your duration in seconds
-
-// Update the CSS transition:
-// In styles.css, find:
-transition: stroke-dashoffset 15s linear; // Change 15s to match
-
-// Update the Firestore field:
-durationMs: 15000, // Change to match
+#### Step B: Run Dynamic SNR Augmentation
+```bash
+python -m noise_pipeline.augment_dataset
 ```
+Generates **4 variations per clean recording** at exact Signal-to-Noise Ratios:
+1. **Clean Sample (Original)**: 100% clean voice.
+2. **Low Noise (15 dB SNR)**: Subtle background fan hum.
+3. **Medium Noise (10 dB SNR)**: Ambient room chatter / typing.
+4. **High Noise / Impulse (5 dB SNR)**: Sudden transient claps or knocks mixed in.
 
-### Change Color Scheme
+Outputs the final training dataset into `dataset/final_train/` with `dataset/final_train/train_catalog.csv` and SQLite table `final_train_catalog`.
 
-Edit `:root` variables in `styles.css`:
+---
 
-```css
-:root {
-  --accent: #YOUR_PRIMARY_COLOR;
-  --accent-2: #YOUR_SECONDARY_COLOR;
-  /* etc. */
-}
+## 🧪 Testing
+
+Run the automated test suite:
+```bash
+pytest -v
 ```
-
-### Add Form Fields
-
-1. Add the HTML input in `index.html` inside `<form id="sampleForm">`
-2. Get a reference in `app.js`: `const myInput = document.getElementById('myField');`
-3. Include it in the Firestore document in the submit handler
-
----
-
-## Performance
-
-- **Tailwind CDN**: ~50KB gzipped (consider self-hosting for production)
-- **Firebase SDK**: ~100KB total (Firestore + Storage)
-- **Google Fonts**: ~15KB (Inter + JetBrains Mono)
-- **Recorded audio**: ~1MB per 15-second clip (varies by codec)
-
----
-
-## License
-
-This project is provided as-is for educational and commercial use.
-
----
-
-## Support
-
-For issues or questions, refer to:
-- [Firebase Documentation](https://firebase.google.com/docs)
-- [MediaRecorder API](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder)
-- [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API)
-
----
-
-**Built with ❤️ for keyword-spotting ML dataset collection**
